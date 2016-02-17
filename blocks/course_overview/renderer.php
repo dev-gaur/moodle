@@ -23,6 +23,8 @@
  */
 defined('MOODLE_INTERNAL') || die;
 
+require_once($CFG->libdir.'/adminlib.php');
+
 /**
  * Course_overview block rendrer
  *
@@ -350,4 +352,21 @@ class block_course_overview_renderer extends plugin_renderer_base {
 
         return $output;
     }
+
+    /**
+     * Determines whether messaging system is enabled.
+     * @return boolean whether enabled(true) or not(false).
+     */
+    private function is_message_enabled() {
+
+        $section = 'optionalsubsystems';
+
+        $adminroot = admin_get_root(); // Need all settings.
+        $settingspage = $adminroot->locate($section, true);
+
+        $enabled = $settingspage->settings->messaging->get_setting();
+
+        return $enabled;
+    }
+
 }
