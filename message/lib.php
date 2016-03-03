@@ -2139,10 +2139,12 @@ function message_print_message_history($user1, $user2 ,$search = '', $messagelim
     echo $OUTPUT->box_start('user');
     echo $OUTPUT->box_start('generalbox', 'user2');
     // Show user picture with link is real user else without link.
-    if (core_user::is_real_user($user2->id)) {
+    if (core_user::is_real_user($user2->id) && !($user2->id==NULL)) {
         echo $OUTPUT->user_picture($user2, array('size' => 100, 'courseid' => SITEID));
-    } else {
-        echo $OUTPUT->user_picture($user2, array('size' => 100, 'courseid' => SITEID, 'link' => false));
+    } else {//if the user2 id is null or not real user 
+        $userpictureparams['link'] = false;//removing the link of no-reply-user
+     	echo $OUTPUT->user_picture($USER, $userpictureparams);//setting default picture
+     	echo fullname($user);
     }
     echo html_writer::tag('div', fullname($user2), array('class' => 'heading'));
 
