@@ -304,7 +304,11 @@ if ($formdata = $mform2->is_cancelled()) {
             $user->mnethostid = $CFG->mnet_localhost_id;
         }
 
-        if ($existinguser = $DB->get_record('user', array('username'=>$user->username, 'mnethostid'=>$user->mnethostid))) {
+        $select = $DB->sql_like('email', ':email', false, true, false, '|'). " AND mnethostid = :mnethostid ".
+                        "AND deleted = 0 AND suspended = 0";
+        $params = array('email' => $DB->sql_like_escape($user->email, '|'), 'mnethostid' => $user->mnethostid);
+
+        if ($existinguser = $DB->get_record_select('user', $select, $params, '*')) {
             $upt->track('id', $existinguser->id, 'normal', false);
         }
 
@@ -568,7 +572,15 @@ if ($formdata = $mform2->is_cancelled()) {
                     if ($existinguser->$column !== $user->$column) {
                         if ($column === 'email') {
                             if ($DB->record_exists('user', array('email'=>$user->email))) {
-                                if ($noemailduplicates) {
+
+                                $changeincase = core_text::strtolower($existinguser->$column) === core_text::strtolower(
+                                                $user->$column);
+
+                                if ($changeincase) {
+                                    // If only case is different then switch to lower case and carry on.
+                                    $user->$column = core_text::strtolower($user->$column);
+                                    continue;
+                                } else if ($noemailduplicates) {
                                     $upt->track('email', $stremailduplicate, 'error');
                                     $upt->track('status', $strusernotupdated, 'error');
                                     $userserrors++;
