@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Search area for Users.
+ * Search area for Users for whom I have authority to view profile.
  *
  * @package    core_user
  * @copyright  2016 Devang Gaur {@link http://www.devanggaur.com}
@@ -27,7 +27,7 @@ namespace core_user\search;
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Search area for Users.
+ * Search area for Users for whom I have access to view profile.
  *
  * @package    core_user
  * @copyright  2016 Devang Gaur {@link http://www.devanggaur.com}
@@ -35,23 +35,60 @@ defined('MOODLE_INTERNAL') || die();
  */
 class user extends \core_search\area\base {
 
+	/**
+	 * Returns recordset containing required data attributes for indexing.
+	 * 
+	 * @param number $modifiedfrom
+	 * @return \moodle_recordset
+	 */
 	public function get_recordset_by_timestamp($modifiedfrom = 0) {
 		
 	}
 
-	public function get_document(){
-		
-	}
-		
-	public function check_access(){
+	/**
+	 * Returns the document
+	 * 
+	 * @param StdClass $record
+	 * @param array $options
+	 * @return core_search/document
+	 */
+	public function get_document($record, $options = array()){
+		try {
+			$context = \context_course::instance($record->contextid);
+		} catch (\dml_missing_record_exception $ex) {
 			
+		} catch (\dml_exception $ex) {
+			
+		}
 	}
 	
-	public function get_doc_url(){
-		
+	/**
+	 * Checking whether I can access a document
+	 * 
+	 * @param int $id course id
+	 * @return int
+	 */
+	public function check_access($id){		
+		return \core_search\manager::ACCESS_GRANTED;
 	}
 	
-	public function get_context_url(){
-		
+	/**
+	 * Returns a url to the document.
+	 * 
+	 * @param \core_search\document $doc
+	 * @return moodle_url
+	 */
+	public function get_doc_url(\core_search\document $doc){
+		return $this->get_context_url($doc);
+	}
+	
+	/**
+	 * Returns a url to the document context.
+	 * 
+	 * @param \core_search\document $doc
+	 * @return moodle_url
+	 */
+	public function get_context_url(\core_search\document $doc){
+		return new moodle_url("");
 	}
 }
