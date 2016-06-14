@@ -24,6 +24,9 @@
 
 namespace core_user\search;
 
+require_once($CFG->dirroot . '/lib/moodlelib.php');
+require_once($CFG->dirroot . '/user/lib.php');
+
 defined('MOODLE_INTERNAL') || die();
 
 /**
@@ -35,6 +38,22 @@ defined('MOODLE_INTERNAL') || die();
  */
 class user extends \core_search\area\base {
 
+	protected $usercontext;
+
+	/**
+	 * The records of deleted users have the "deleted" field assigned as one.
+	 * 
+	 * @var int
+	 */
+	const USER_DELETED = 1;
+	
+	/**
+	 * The moodle installation record is stored as a course. It is the first record in the course db table 
+	 * 
+	 * @var int
+	 */
+	const MOODLE_COURSE = 1;
+
 	/**
 	 * Returns recordset containing required data attributes for indexing.
 	 * 
@@ -42,24 +61,50 @@ class user extends \core_search\area\base {
 	 * @return \moodle_recordset
 	 */
 	public function get_recordset_by_timestamp($modifiedfrom = 0) {
-		
+		global $DB;
+		return $DB->get_recordset_select('user', 'timemodified >= ? AND deleted <> ?', array($modifiedfrom, self::USER_DELETED));
 	}
 
 	/**
-	 * Returns the document
+	 * Returns document instances for each record in the recordset
 	 * 
 	 * @param StdClass $record
 	 * @param array $options
 	 * @return core_search/document
 	 */
 	public function get_document($record, $options = array()){
-		try {
-			$context = \context_course::instance($record->contextid);
-		} catch (\dml_missing_record_exception $ex) {
-			
-		} catch (\dml_exception $ex) {
-			
-		}
+	    try {
+	        $this->usercontext = $context = \context_user::instance($record->id, MUST_EXIST);
+	        var_dump($context);
+	        var_dump($this->usercontext);
+	    } catch (\dml_missing_record_exception $ex) {
+	        debugging('Error retrieving ' . $this->areaid . ' ' . $record->id . ' document, not all required data is available: ' .
+	            $ex->getMessage(), DEBUG_DEVELOPER);
+	        return false;
+	    } catch (\dml_exception $ex) {
+	        debugging('Error retrieving ' . $this->areaid . ' ' . $record->id . ' document: ' . $ex->getMessage(), DEBUG_DEVELOPER);
+	        return false;
+	    }
+	    
+	    // Prepare associative array with data from DB.
+	    $doc = \core_search\document_factory::instance($record->id, $this->componentname, $this->areaname);
+        // Assigning properties to our document
+	    $doc->set('title', content_to_text(fullname($record)/*$record->firstname.' '.$record->lastname*/, false));
+        $doc->set('content', content_to_text($record->email, false));
+        $doc->set('contextid', $context->id);
+        $doc->set('courseid', self::MOODLE_COURSE);
+        $doc->set('itemid', $record->id);
+        $doc->set('owneruserid', \core_search\manager::NO_OWNER_ID);
+        $doc->set('modified', $record->timemodified);
+        $doc->set('description1', content_to_text($record->firstname.' '.$record->middlename.' '.$record->lastname.' ( '.$record->username.' )', false));
+        
+        // Check if this document should be considered new.
+        if (isset($options['lastindexedtime']) && $options['lastindexedtime'] < $record->timecreated) {
+        	// If the document was created after the last index time, it must be new.
+        	$doc->set_is_new(true);
+        }
+        
+        return $doc;
 	}
 	
 	/**
@@ -68,12 +113,20 @@ class user extends \core_search\area\base {
 	 * @param int $id course id
 	 * @return int
 	 */
-	public function check_access($id){		
+	public function check_access($id){
+		var_dump($id);
+		var_dump($this->usercontext);
+		/*if ($user->deleted) {
+			return \core_search\manager::ACCESS_DELETED;
+		}
+		if (!has_capability('moodle/user:viewdetails', $this->usercontext)) {
+			return \core_search\manager::ACCESS_GRANTED;
+		}*/
 		return \core_search\manager::ACCESS_GRANTED;
 	}
 	
 	/**
-	 * Returns a url to the document.
+	 * Returns a url to the profile page of user.
 	 * 
 	 * @param \core_search\document $doc
 	 * @return moodle_url
@@ -89,6 +142,6 @@ class user extends \core_search\area\base {
 	 * @return moodle_url
 	 */
 	public function get_context_url(\core_search\document $doc){
-		return new moodle_url("");
+		return new \moodle_url('/user/profile.php', array('id' => $doc->get('itemid')));
 	}
 }
