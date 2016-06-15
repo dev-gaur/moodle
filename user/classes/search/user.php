@@ -26,6 +26,8 @@ namespace core_user\search;
 
 require_once($CFG->dirroot . '/lib/moodlelib.php');
 require_once($CFG->dirroot . '/user/lib.php');
+require_once($CFG->dirroot . '/lib/accesslib.php');
+require_once($CFG->dirroot . '/lib/enrollib.php');
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -38,8 +40,6 @@ defined('MOODLE_INTERNAL') || die();
  */
 class user extends \core_search\area\base {
 
-	protected $usercontext;
-
 	/**
 	 * The records of deleted users have the "deleted" field assigned as one.
 	 * 
@@ -47,13 +47,6 @@ class user extends \core_search\area\base {
 	 */
 	const USER_DELETED = 1;
 	
-	/**
-	 * The moodle installation record is stored as a course. It is the first record in the course db table 
-	 * 
-	 * @var int
-	 */
-	const MOODLE_COURSE = 1;
-
 	/**
 	 * Returns recordset containing required data attributes for indexing.
 	 * 
@@ -74,9 +67,7 @@ class user extends \core_search\area\base {
 	 */
 	public function get_document($record, $options = array()){
 	    try {
-	        $this->usercontext = $context = \context_user::instance($record->id, MUST_EXIST);
-	        var_dump($context);
-	        var_dump($this->usercontext);
+	        $context = \context_user::instance($record->id, MUST_EXIST);
 	    } catch (\dml_missing_record_exception $ex) {
 	        debugging('Error retrieving ' . $this->areaid . ' ' . $record->id . ' document, not all required data is available: ' .
 	            $ex->getMessage(), DEBUG_DEVELOPER);
@@ -92,11 +83,12 @@ class user extends \core_search\area\base {
 	    $doc->set('title', content_to_text(fullname($record)/*$record->firstname.' '.$record->lastname*/, false));
         $doc->set('content', content_to_text($record->email, false));
         $doc->set('contextid', $context->id);
-        $doc->set('courseid', self::MOODLE_COURSE);
+        $doc->set('courseid', SITEID);
         $doc->set('itemid', $record->id);
         $doc->set('owneruserid', \core_search\manager::NO_OWNER_ID);
         $doc->set('modified', $record->timemodified);
         $doc->set('description1', content_to_text($record->firstname.' '.$record->middlename.' '.$record->lastname.' ( '.$record->username.' )', false));
+        $doc->set('description2', content_to_text($record->description, false));
         
         // Check if this document should be considered new.
         if (isset($options['lastindexedtime']) && $options['lastindexedtime'] < $record->timecreated) {
@@ -110,19 +102,49 @@ class user extends \core_search\area\base {
 	/**
 	 * Checking whether I can access a document
 	 * 
-	 * @param int $id course id
+	 * @param int $id user id
 	 * @return int
 	 */
 	public function check_access($id){
-		var_dump($id);
-		var_dump($this->usercontext);
-		/*if ($user->deleted) {
+		global $DB, $USER;
+		var_dump("one");
+		try {
+			$usercontext = \context_user::instance($id);
+			var_dump("two");
+		} catch (\dml_missing_record_exception $ex) {
+			debugging('Error retrieving ' . $this->areaid . ' ' . $record->id . ' document, not all required data is available: ' .
+					$ex->getMessage(), DEBUG_DEVELOPER);
+			return \core_search\manager::ACCESS_DELETED;
+		} catch (\dml_exception $ex) {
+			debugging('Error retrieving ' . $this->areaid . ' ' . $record->id . ' document: ' . $ex->getMessage(), DEBUG_DEVELOPER);
 			return \core_search\manager::ACCESS_DELETED;
 		}
-		if (!has_capability('moodle/user:viewdetails', $this->usercontext)) {
+		var_dump("three");
+		$user = $DB->get_record_select('user', 'id = ?', array($id)); 
+		if ($user->deleted) {
+			var_dump("four");
+			return \core_search\manager::ACCESS_DELETED;
+		}
+		if (has_capability('moodle/user:viewdetails', $usercontext) || has_coursecontact_role($id)) {
+			var_dump("started from the bottom");
 			return \core_search\manager::ACCESS_GRANTED;
-		}*/
-		return \core_search\manager::ACCESS_GRANTED;
+		}
+		
+		$sharedcourses = enrol_get_shared_courses($USER->id, $user->id, true);
+
+		foreach ($sharedcourses as $sharedcourse) {
+			var_dump("now we here!");
+			$coursecontext = \context_course::instance($sharedcourse->id);
+			if (has_capability('moodle/user:viewdetails', $coursecontext)) {
+				if (!groups_user_groups_visible($sharedcourse, $user->id)) {
+					// Not a member of the same group.
+					continue;
+				}
+				return \core_search\manager::ACCESS_GRANTED;
+			}
+		}
+		
+		return \core_search\manager::ACCESS_DENIED;
 	}
 	
 	/**
