@@ -24,8 +24,6 @@
 
 namespace core_user\search;
 
-require_once($CFG->dirroot . '/lib/moodlelib.php');
-require_once($CFG->dirroot . '/user/lib.php');
 require_once($CFG->dirroot . '/lib/accesslib.php');
 require_once($CFG->dirroot . '/lib/enrollib.php');
 
@@ -59,7 +57,7 @@ class user extends \core_search\area\base {
 	}
 
 	/**
-	 * Returns document instances for each record in the recordset
+	 * Returns document instances for each record in the recordset.
 	 * 
 	 * @param StdClass $record
 	 * @param array $options
@@ -67,7 +65,7 @@ class user extends \core_search\area\base {
 	 */
 	public function get_document($record, $options = array()){
 	    try {
-	        $context = \context_user::instance($record->id, MUST_EXIST);
+	    	$context = \context_system::instance();
 	    } catch (\dml_missing_record_exception $ex) {
 	        debugging('Error retrieving ' . $this->areaid . ' ' . $record->id . ' document, not all required data is available: ' .
 	            $ex->getMessage(), DEBUG_DEVELOPER);
@@ -107,10 +105,9 @@ class user extends \core_search\area\base {
 	 */
 	public function check_access($id){
 		global $DB, $USER;
-		var_dump("one");
+
 		try {
 			$usercontext = \context_user::instance($id);
-			var_dump("two");
 		} catch (\dml_missing_record_exception $ex) {
 			debugging('Error retrieving ' . $this->areaid . ' ' . $record->id . ' document, not all required data is available: ' .
 					$ex->getMessage(), DEBUG_DEVELOPER);
@@ -119,21 +116,19 @@ class user extends \core_search\area\base {
 			debugging('Error retrieving ' . $this->areaid . ' ' . $record->id . ' document: ' . $ex->getMessage(), DEBUG_DEVELOPER);
 			return \core_search\manager::ACCESS_DELETED;
 		}
-		var_dump("three");
+
 		$user = $DB->get_record_select('user', 'id = ?', array($id)); 
 		if ($user->deleted) {
-			var_dump("four");
 			return \core_search\manager::ACCESS_DELETED;
 		}
+
 		if (has_capability('moodle/user:viewdetails', $usercontext) || has_coursecontact_role($id)) {
-			var_dump("started from the bottom");
 			return \core_search\manager::ACCESS_GRANTED;
 		}
 		
 		$sharedcourses = enrol_get_shared_courses($USER->id, $user->id, true);
 
 		foreach ($sharedcourses as $sharedcourse) {
-			var_dump("now we here!");
 			$coursecontext = \context_course::instance($sharedcourse->id);
 			if (has_capability('moodle/user:viewdetails', $coursecontext)) {
 				if (!groups_user_groups_visible($sharedcourse, $user->id)) {
