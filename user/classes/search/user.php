@@ -86,7 +86,6 @@ class user extends \core_search\area\base {
         $doc->set('owneruserid', \core_search\manager::NO_OWNER_ID);
         $doc->set('modified', $record->timemodified);
         $doc->set('description1', content_to_text($record->firstname.' '.$record->middlename.' '.$record->lastname.' ( '.$record->username.' )', false));
-        $doc->set('description2', content_to_text($record->description, false));
         
         // Check if this document should be considered new.
         if (isset($options['lastindexedtime']) && $options['lastindexedtime'] < $record->timecreated) {
