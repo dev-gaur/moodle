@@ -328,13 +328,16 @@ class manager {
 
         // Split areas by context level so we only iterate only once through courses and cms.
         $searchareas = static::get_search_areas_list(true);
+        var_dump($searchareas);
         foreach ($searchareas as $areaid => $unused) {
             $classname = static::get_area_classname($areaid);
+            var_dump($classname);
             $searcharea = new $classname();
             foreach ($classname::get_levels() as $level) {
                 $areasbylevel[$level][$areaid] = $searcharea;
             }
         }
+        var_dump($areasbylevel);
 
         // This will store area - allowed contexts relations.
         $areascontexts = array();
@@ -346,9 +349,19 @@ class manager {
 
             $systemcontextid = \context_system::instance()->id;
             foreach ($areasbylevel[CONTEXT_SYSTEM] as $areaid => $searchclass) {
-                $areascontexts[$areaid][] = $systemcontextid;
+                $areascontexts[$areaid][$systemcontextid] = $systemcontextid;
             }
         }
+
+        if (!empty($areasbylevel[CONTEXT_USER])) {
+            if ($usercontext = \context_user::instance($USER->id, IGNORE_MISSING)) {
+                // Extra checking although only logged users should reach this point, guest users have a valid context id.
+                foreach ($areasbylevel[CONTEXT_USER] as $areaid => $searchclass) {
+                    $areascontexts[$areaid][$usercontext->id] = $usercontext->id;
+                }
+            }
+        }
+
 
         // Get the courses where the current user has access.
         $courses = enrol_get_my_courses(array('id', 'cacherev'));
