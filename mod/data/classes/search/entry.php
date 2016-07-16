@@ -46,7 +46,7 @@ class entry extends \core_search\area\base_mod {
 
         $sql = "SELECT dr.*, d.course FROM {data_records} dr
                   JOIN {data} d ON d.id = dr.dataid
-                WHERE dr.timemodified >= ?";
+                WHERE dr.approved = 1 AND dr.timemodified >= ?";
         return $DB->get_recordset_sql($sql, array($modifiedfrom));
     }
 
@@ -77,6 +77,8 @@ class entry extends \core_search\area\base_mod {
         $indexfields = array();
         $contents = $DB->get_records('data_content', array('recordid' => $entry->id));
 
+        var_dump($contents);
+
         // Prepare associative array with data from DB.
         $doc = \core_search\document_factory::instance($entry->id, $this->componentname, $this->areaname);
         $doc->set('title', content_to_text($indexfields['title'], false));
@@ -105,7 +107,7 @@ class entry extends \core_search\area\base_mod {
      * @return bool
      */
     public function check_access($doc) {
-
+        return \core_search\manager::ACCESS_GRANTED;
     }
 
     /**
@@ -115,7 +117,7 @@ class entry extends \core_search\area\base_mod {
      * @return \moodle_url
      */
     public function get_doc_url(\core_search\document $doc) {
-
+        return \moodle_url('');
     }
 
     /**
@@ -125,7 +127,7 @@ class entry extends \core_search\area\base_mod {
      * @return \moodle_url
      */
     public function get_context_url(\core_search\document $doc) {
-
+		return \moodle_url('');
     }
 
 /*
