@@ -26,6 +26,8 @@ namespace mod_data\search;
 
 defined('MOODLE_INTERNAL') || die();
 
+require_once($CFG->dirroot . '/mod/data/lib.php');
+
 /**
  * Search area for mod_data activity entries.
  *
@@ -35,7 +37,19 @@ defined('MOODLE_INTERNAL') || die();
  */
 class entry extends \core_search\area\base_mod {
 
-    /**
+	
+	/**
+	 * @var array Internal quick static cache.
+	 */
+	protected $entriesdata = array();
+
+	
+	/**
+	 * @var array Internal quick static cache.
+	 */
+	protected $databaseactivitydata = array();
+
+	/**
      * Returns recordset containing required data for indexing database entries.
      *
      * @param int $modifiedfrom timestamp
@@ -46,7 +60,7 @@ class entry extends \core_search\area\base_mod {
 
         $sql = "SELECT dr.*, d.course FROM {data_records} dr
                   JOIN {data} d ON d.id = dr.dataid
-                WHERE dr.approved = 1 AND dr.timemodified >= ?";
+                WHERE dr.timemodified >= ?";
         return $DB->get_recordset_sql($sql, array($modifiedfrom));
     }
 
@@ -77,25 +91,79 @@ class entry extends \core_search\area\base_mod {
         $indexfields = array();
         $contents = $DB->get_records('data_content', array('recordid' => $entry->id));
 
-        var_dump($contents);
-
         // Prepare associative array with data from DB.
         $doc = \core_search\document_factory::instance($entry->id, $this->componentname, $this->areaname);
-        $doc->set('title', content_to_text($indexfields['title'], false));
-        $doc->set('content', content_to_text($indexfields['content'], false));
         $doc->set('contextid', $context->id);
         $doc->set('courseid', $entry->course);
         $doc->set('userid', $entry->userid);
         $doc->set('owneruserid', \core_search\manager::NO_OWNER_ID);
         $doc->set('modified', $entry->timemodified);
 
+        $doc->set('title', content_to_text("yay", false));
+        $doc->set('content', content_to_text("ya", false));
+        $doc->set('description1', content_to_text("yayayaya", false));
+        $doc->set('description2', content_to_text("yaya", false));
+
+
+        $indexfields = $this->get_fields_for_entries($entry);
+/*        
+        if (isset($indexfields['title'])) {
+        	$doc->set('title', content_to_text($indexfields['title'], false));
+        } else {
+        	return false;
+        }
+
+        if (isset($indexfields['title'])) {
+        	$doc->set('content', content_to_text($indexfields['content'], false));
+        } else {
+        	$doc->set('content', content_to_text('', false));
+        }
+
+        if (isset($indexfields['desc1'])) {
+        	$doc->set('description1', content_to_text($indexfields['desc1'], false));
+        }
+
+		if (isset($indexfields['desc2'])) {
+        	$doc->set('description2', content_to_text($indexfields['desc2'], false));
+        }
+
         // Check if this document should be considered new.
         if (isset($options['lastindexedtime']) && ($options['lastindexedtime'] < $entry->timecreated)) {
             // If the document was created after the last index time, it must be new.
             $doc->set_is_new(true);
         }
-
+*/
         return $doc;
+    }
+
+    /**
+     * get_fields_for_entries
+     *
+     * @param StdClass entry
+     * @return array()
+     */
+    protected function get_fields_for_entries($entry) {
+    	global $DB;
+
+    	$indexfields = array();
+    	
+    	$validfields = array('text', 'textarea', 'menu', 'radiobutton', 'checkbox', 'multimenu', 'url');
+
+    	$priority = array(
+    			'text' => 1,
+    			'textarea' => 2,
+    			'menu' => 2,
+    			'radiobutton' => 2,
+    			'checkbox' => 3,
+    			'multimenu' => 3,
+    			'url' => 4
+    			);
+
+    	$sql = "SELECT * FROM {data_content} dc, {data_field} df WHERE dc.fieldid = df.id AND dc.recordid = ?;
+    	$contents = $DB->get_records_sql($sql, array($entry->id));
+
+    	var_dump($contents);
+    	return $indexfields;
     }
 
     /**
@@ -106,7 +174,35 @@ class entry extends \core_search\area\base_mod {
      * @param int $id Glossary entry id
      * @return bool
      */
-    public function check_access($doc) {
+    public function check_access($id) {
+    	global $DB, $USER;
+
+    	$now = time();
+    	
+        $sql = "SELECT dr.*, d.* FROM {data_records} dr
+                  JOIN {data} d ON d.id = dr.dataid
+                WHERE dr.id = :id";
+    	$entry = $DB->get_record_sql($sql, array( 'id' => $id ), MUST_EXIST);
+
+    	if (!$entry) {
+    		return \core_search\manager::ACCESS_DELETED;
+    	}
+
+    	if (($entry->timeviewfrom && $now < $entry->timeviewfrom) || ($entry->timeviewto && $now > $entry->timeviewto)) {
+    		return \core_search\manager::ACCESS_DENIED;
+    	}
+    	
+    	if (!$entry->approved) {
+    		return \core_search\manager::ACCESS_DENIED;
+    	}
+
+    	$cm = $this->get_cm('data', $entry->dataid, $entry->course);
+    	$context = context_module::instance($cm->id);
+
+    	if(!has_capability('mod/data:viewentry', $context)) {
+    		return \core_search\manager::ACCESS_DENIED;
+    	}
+    	 
         return \core_search\manager::ACCESS_GRANTED;
     }
 
@@ -117,38 +213,91 @@ class entry extends \core_search\area\base_mod {
      * @return \moodle_url
      */
     public function get_doc_url(\core_search\document $doc) {
-        return \moodle_url('');
+    	$entry = $this->get_entry($doc->get('itemid'));
+    	return new \moodle_url('/mod/data/view.php', array( 'd' => $entry->dataid, 'rid' => $entry->id ));
     }
 
     /**
-     * Link to the database entry.
+     * Link to the database activity.
      *
      * @param \core_search\document $doc
      * @return \moodle_url
      */
     public function get_context_url(\core_search\document $doc) {
-		return \moodle_url('');
+    	$entry = $this->get_entry($doc->get('itemid'));
+    	return new \moodle_url('/mod/data/view.php', array('d' => $entry->dataid));
     }
 
-/*
     /**
-     * Returns the specified glossary entry checking the internal cache.
+     * Returns true if this area uses file indexing.
      *
-     * Store minimal information as this might grow.
+     * @return bool
+     */
+    public function uses_file_indexing() {
+    	return true;
+    }
+    
+    /**
+     * Add the database entries attachments.
      *
-     * @throws \dml_exception
+     * @param document $document The current document
+     * @return null
+     */
+    public function attach_files($doc) {
+    	global $DB;
+
+    	$entryid = $doc->get('itemid');
+    
+    	try {
+    		$entry = $this->get_entry_data($entryid);
+    	} catch (\dml_missing_record_exception $e) {
+    		debugging('Could not get record to attach files to '.$doc->get('id'), DEBUG_DEVELOPER);
+    		return;
+    	}
+
+    	$cm = $this->get_cm('data', $entry->dataid, $doc->get('courseid'));
+    	$context = \context_module::instance($cm->id);
+    
+    	// Get the files and attach them.
+    	$fs = get_file_storage();
+    	$files = $fs->get_area_files($context->id, 'mod_data', 'attachment', $entryid, "filename", false);
+    	foreach ($files as $file) {
+    		$doc->add_stored_file($file);
+    	}
+    }
+    
+    /*
+     * Get database entry data
+     * 
      * @param int $entryid
-     * @return stdClass
-     *
+     * @return array
+     */
     protected function get_entry($entryid) {
         global $DB;
 
         if (empty($this->entriesdata[$entryid])) {
-            $this->entriesdata[$entryid] = $DB->get_record_sql("SELECT ge.*, g.course, g.defaultapproval FROM {glossary_entries} ge
-                                                                  JOIN {glossary} g ON g.id = ge.glossaryid
-                                                                WHERE ge.id = ?", array('id' => $entryid), MUST_EXIST);
+        	$this->entriesdata[$entryid] = $DB->get_record('data_records', array( 'id'=> $entryid ), '*', IGNORE_MISSING);
         }
+        
         return $this->entriesdata[$entryid];
     }
-*/
+    
+    /*
+     * Get database entry data
+     *
+     * @param int $entryid
+     * @return array
+     */
+    protected function get_database($dataid) {
+    	global $DB;
+    
+    	if (empty($this->databaseactivitydata[$entryid])) {
+    		$this->databaseactivitydata[$entryid] = $DB->get_record('data', array( 'id'=> $dataid ), '*', MUST_EXIST);
+    	}
+
+    	return $this->databaseactivitydata[$entryid];
+    }
+    
+    
+
 }
