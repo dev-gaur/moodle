@@ -106,10 +106,19 @@ class entry extends \core_search\area\base_mod {
         $doc->set('description2', content_to_text("yaya", false));
 
         $indexfields = $this->get_fields_for_entries($entry);
-        var_dump($indexfields);
         
-        $doc->set('title', $indexfields[0]);
-        $doc->set('content', $indexfields[1]);
+        if(sizeof($indexfields)) {
+        	$doc->set('title', $indexfields[0]);
+        } else {
+        	return false;
+        }
+        
+        if (sizeof($indexfields) >= 2) {
+        	$doc->set('content', $indexfields[1]); 
+        } else {
+        	return false;
+        }
+
         if (isset($indexfields[2])) {
         	$doc->set('description1', $indexfields[2]);
         }
@@ -117,34 +126,7 @@ class entry extends \core_search\area\base_mod {
         if (isset($indexfields[3])) {
         	$doc->set('description2', $indexfields[3]);
         }
-                
-/*        
-        if (isset($indexfields['title'])) {
-        	$doc->set('title', content_to_text($indexfields['title'], false));
-        } else {
-        	return false;
-        }
 
-        if (isset($indexfields['title'])) {
-        	$doc->set('content', content_to_text($indexfields['content'], false));
-        } else {
-        	$doc->set('content', content_to_text('', false));
-        }
-
-        if (isset($indexfields['desc1'])) {
-        	$doc->set('description1', content_to_text($indexfields['desc1'], false));
-        }
-
-		if (isset($indexfields['desc2'])) {
-        	$doc->set('description2', content_to_text($indexfields['desc2'], false));
-        }
-
-        // Check if this document should be considered new.
-        if (isset($options['lastindexedtime']) && ($options['lastindexedtime'] < $entry->timecreated)) {
-            // If the document was created after the last index time, it must be new.
-            $doc->set_is_new(true);
-        }
-*/
         return $doc;
     }
 
