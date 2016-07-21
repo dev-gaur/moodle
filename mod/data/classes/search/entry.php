@@ -28,6 +28,7 @@ defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->dirroot . '/mod/data/lib.php');
 
+use DOMDocument;
 /**
  * Search area for mod_data activity entries.
  *
@@ -104,8 +105,19 @@ class entry extends \core_search\area\base_mod {
         $doc->set('description1', content_to_text("yayayaya", false));
         $doc->set('description2', content_to_text("yaya", false));
 
-
         $indexfields = $this->get_fields_for_entries($entry);
+        var_dump($indexfields);
+        
+        $doc->set('title', $indexfields[0]);
+        $doc->set('content', $indexfields[1]);
+        if (isset($indexfields[2])) {
+        	$doc->set('description1', $indexfields[2]);
+        }
+
+        if (isset($indexfields[3])) {
+        	$doc->set('description2', $indexfields[3]);
+        }
+                
 /*        
         if (isset($indexfields['title'])) {
         	$doc->set('title', content_to_text($indexfields['title'], false));
@@ -137,36 +149,6 @@ class entry extends \core_search\area\base_mod {
     }
 
     /**
-     * get_fields_for_entries
-     *
-     * @param StdClass entry
-     * @return array()
-     */
-    protected function get_fields_for_entries($entry) {
-    	global $DB;
-
-    	$indexfields = array();
-    	
-    	$validfields = array('text', 'textarea', 'menu', 'radiobutton', 'checkbox', 'multimenu', 'url');
-
-    	$priority = array(
-    			'text' => 1,
-    			'textarea' => 2,
-    			'menu' => 2,
-    			'radiobutton' => 2,
-    			'checkbox' => 3,
-    			'multimenu' => 3,
-    			'url' => 4
-    			);
-
-    	$sql = "SELECT * FROM {data_content} dc, {data_field} df WHERE dc.fieldid = df.id AND dc.recordid = ?;
-    	$contents = $DB->get_records_sql($sql, array($entry->id));
-
-    	var_dump($contents);
-    	return $indexfields;
-    }
-
-    /**
      * Whether the user can access the document or not.
      *
      * @throws \dml_missing_record_exception
@@ -179,10 +161,8 @@ class entry extends \core_search\area\base_mod {
 
     	$now = time();
     	
-        $sql = "SELECT dr.*, d.* FROM {data_records} dr
-                  JOIN {data} d ON d.id = dr.dataid
-                WHERE dr.id = :id";
-    	$entry = $DB->get_record_sql($sql, array( 'id' => $id ), MUST_EXIST);
+        $sql = 'SELECT dr.*, d.* FROM {data_records} dr JOIN {data} d ON d.id = dr.dataid WHERE dr.id = ?';
+    	$entry = $DB->get_record_sql($sql, array( $id ), IGNORE_MISSING);
 
     	if (!$entry) {
     		return \core_search\manager::ACCESS_DELETED;
@@ -197,7 +177,7 @@ class entry extends \core_search\area\base_mod {
     	}
 
     	$cm = $this->get_cm('data', $entry->dataid, $entry->course);
-    	$context = context_module::instance($cm->id);
+    	$context = \context_module::instance($cm->id);
 
     	if(!has_capability('mod/data:viewentry', $context)) {
     		return \core_search\manager::ACCESS_DENIED;
@@ -249,7 +229,7 @@ class entry extends \core_search\area\base_mod {
     	$entryid = $doc->get('itemid');
     
     	try {
-    		$entry = $this->get_entry_data($entryid);
+    		$entry = $this->get_entry($entryid);
     	} catch (\dml_missing_record_exception $e) {
     		debugging('Could not get record to attach files to '.$doc->get('id'), DEBUG_DEVELOPER);
     		return;
@@ -260,7 +240,7 @@ class entry extends \core_search\area\base_mod {
     
     	// Get the files and attach them.
     	$fs = get_file_storage();
-    	$files = $fs->get_area_files($context->id, 'mod_data', 'attachment', $entryid, "filename", false);
+    	$files = $fs->get_area_files($context->id, 'mod_data', 'attachment', $entryid, 'filename', false);
     	foreach ($files as $file) {
     		$doc->add_stored_file($file);
     	}
@@ -296,8 +276,161 @@ class entry extends \core_search\area\base_mod {
     	}
 
     	return $this->databaseactivitydata[$entryid];
-    }
-    
-    
+    }    
 
+    /**
+     * get_fields_for_entries
+     *
+     * @param StdClass entry
+     * @return array()
+     */
+    protected function get_fields_for_entries($entry) {
+    	global $DB;
+    
+    	$indexfields = array();
+
+    	$validfields = array('text', 'textarea', 'menu', 'radiobutton', 'checkbox', 'multimenu', 'url');
+    	
+    	$fieldtypepriorities = array(
+    			'text' => 4,
+    			'textarea' => 3,
+    			'menu' => 3,
+    			'radiobutton' => 3,
+    			'checkbox' => 2,
+    			'multimenu' => 2,
+    			'url' => 1
+    		);
+
+    	 
+    	$sql = 'SELECT dc.id, dc.content, df.name as fldname, df.type as fldtype, df.required FROM {data_content} dc, {data_fields} df WHERE dc.fieldid = df.id AND dc.recordid = ?';
+    	$contents = $DB->get_records_sql($sql, array($entry->id));
+    	$filteredcontents = array();
+
+		// Filtering out the data_content records having invalid fieldtypes.
+    	foreach ($contents as $content) {
+    		if (in_array($content->fldtype, $validfields)) {
+    			$filteredcontents[] = $content;
+    		}
+    	}
+    	
+    	$validfieldsname = array();
+    	foreach ($filteredcontents as $content) {
+    		$content->priority = $fieldtypepriorities[$content->fldtype];
+    		$validfieldsnames[] = $content->fldname;
+    	}
+
+    	// Array to describe the order of the selected fields.
+    	$fieldorder = array();
+
+    	// Retrieving order of fields from the 'Add Entry template' of the database.
+    	$dom = new DOMDocument();
+
+    	$template = $DB->get_record_sql('SELECT addtemplate FROM {data} WHERE id = ?', array($entry->dataid));
+    	$template = $template->addtemplate;
+
+    	$dom->loadHTML($template);
+    	$dom->preserveWhiteSpace = false;
+
+    	$rowsintemplate = $dom->getElementsByTagName('tr');
+    	 
+    	$numberofrowsintemplate = $rowsintemplate->length;
+    	
+    	foreach ($rowsintemplate as $row) {
+    	
+    		$txtContent = $row->childNodes[2]->textContent;
+    		$txtContent = rtrim($txtContent, ']]');
+    		$txtContent = ltrim($txtContent, '[[');
+
+    		if(in_array($txtContent, $validfieldsnames)){
+    			$fieldorder[] = $txtContent;
+    		}
+    	}
+
+    	// Removing all the duplicate fieldname entries from the order.
+    	$fieldorder = array_unique($fieldorder);
+    	
+    	$fieldorderqueue = new \SPLPriorityQueue();
+
+    	foreach ($filteredcontents as $content) {
+    		
+    		$fieldorderqueue->insert($content, sizeof($fieldorder) - array_search($content->fldname, $fieldorder));
+    	}    	
+    	
+    	$filteredcontents = array();
+    	
+    	while ($fieldorderqueue->valid()) {
+    		$filteredcontents[] = $fieldorderqueue->extract();
+    	}
+
+    	// Using a PriorityQueure instance to sort out the filtered contents according to these rules :
+    	// 1. Priorities in $fieldtypepriorities
+    	// 2. Compulsory fieldtypes are to be given the top priority.
+    	$sortedcontentqueue = new SortedContentQueue($filteredcontents);
+
+    	foreach ($filteredcontents as $content) {
+    		$sortedcontentqueue->insert($content, array_search($content, $filteredcontents));
+    	}
+
+    	while ($sortedcontentqueue->valid()) {
+
+    		$content = $sortedcontentqueue->extract();
+    		$fieldvalue = '';
+    		
+    		if($content->fldtype === 'multimenu' || $content->fldtype === 'checkbox') {
+    			$arr = explode('##', $content->content);
+
+    			foreach ($arr as $a) {
+    				$fieldvalue .= $a.' ';
+    			}
+
+    			$fieldvalue = trim($fieldvalue);
+
+    		} elseif ($content->fldtype === 'textarea') {
+				
+    			// Removing all the <p> and <br /> tags from the stored textarea field contents.
+    			$fieldvalue = trim($content->content);
+    			$fieldvalue = str_replace('<br />', ' ', $fieldvalue);
+    			$fieldvalue = str_replace('<p>', '', $fieldvalue);
+    			$fieldvalue = str_replace('</p>', ' ', $fieldvalue);
+    			$fieldvalue = trim($fieldvalue);
+
+    		} else {
+    			$fieldvalue = trim($content->content);
+    		}
+
+    		$indexfields[] = $fieldvalue;
+    	}
+
+    	
+    	return $indexfields;
+    }
+
+}
+
+class SortedContentQueue extends \SPLPriorityQueue {
+	
+	private $contents;
+
+	function __construct($contents) {
+		$this->contents = $contents;
+	}
+
+	public function compare($key1 , $key2) {
+		$record1 = $this->contents[$key1];
+		$record2 = $this->contents[$key2];
+		
+		//if a contents' fieldtype is compulsory in the database than it would be given more priority that any other uncompulsory content
+		if ( ($record1->required && $record2->required) || (!$record1->required && !$record2->required)) {
+			if ($record1->priority === $record2->priority) {
+				return 0;
+			}
+			
+			return $record1->priority < $record2->priority ? -1: 1;
+
+		} elseif ($record1->required && !$record2->required) {
+			return 1;
+		} else {
+			return -1;
+		}
+	}
 }
