@@ -3910,6 +3910,7 @@ function data_process_submission(stdClass $mod, $fields, stdClass $datarecord) {
     $result->fields = array();
 
     $submitteddata = array();
+    var_dump($datarecord);
     foreach ($datarecord as $fieldname => $fieldvalue) {
         if (strpos($fieldname, '_')) {
             $namearray = explode('_', $fieldname, 3);
@@ -3977,6 +3978,8 @@ function data_process_submission(stdClass $mod, $fields, stdClass $datarecord) {
     }
 
     $result->validated = $requiredfieldsfilled && !$emptyform && $fieldsvalidated;
+
+    var_dump($result);
 
     return $result;
 }

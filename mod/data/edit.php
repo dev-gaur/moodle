@@ -247,6 +247,8 @@ if ($datarecord = data_submitted() and confirm_sesskey()) {
 
             // Add all provided content.
             foreach ($processeddata->fields as $fieldname => $field) {
+            	var_dump($fieldname);
+            	var_dump($datarecord->$fieldname);
                 $field->update_content($recordid, $datarecord->$fieldname, $fieldname);
             }
 

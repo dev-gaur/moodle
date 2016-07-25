@@ -29,6 +29,9 @@ defined('MOODLE_INTERNAL') || die();
 global $CFG;
 require_once($CFG->dirroot . '/mod/data/lib.php');
 require_once($CFG->dirroot . '/lib/csvlib.class.php');
+require_once($CFG->dirroot . '/search/tests/fixtures/testable_core_search.php');
+require_once($CFG->dirroot . '/mod/data/tests/generator/lib.php');
+require_once($CFG->dirroot . '/mod/data/lib.php');
 
 
 /**
@@ -90,6 +93,7 @@ class data_advanced_search_sql_test extends advanced_testcase {
      */
     public $approvedatarecordcount = 89;
 
+    
     /**
      * Set up function. In this instance we are setting up database
      * records to be used in the unit tests.
@@ -97,9 +101,6 @@ class data_advanced_search_sql_test extends advanced_testcase {
     protected function setUp() {
         global $DB, $CFG;
         parent::setUp();
-
-        $this->resetAfterTest(true);
-
 
         // we already have 2 users, we need 98 more - let's ignore the fact that guest can not post anywhere
         // We reset the user sequence here to ensure we get the expected numbers.
@@ -242,4 +243,5 @@ class data_advanced_search_sql_test extends advanced_testcase {
         $recordids = data_get_all_recordids($this->recorddata->id, $approvesql, $params);
         $this->assertEquals($this->approvedatarecordcount, count($recordids));
     }
+
 }

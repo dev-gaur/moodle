@@ -100,19 +100,14 @@ class entry extends \core_search\area\base_mod {
         $doc->set('owneruserid', \core_search\manager::NO_OWNER_ID);
         $doc->set('modified', $entry->timemodified);
 
-        $doc->set('title', content_to_text("yay", false));
-        $doc->set('content', content_to_text("ya", false));
-        $doc->set('description1', content_to_text("yayayaya", false));
-        $doc->set('description2', content_to_text("yaya", false));
-
         $indexfields = $this->get_fields_for_entries($entry);
-        
+
         if(sizeof($indexfields)) {
         	$doc->set('title', $indexfields[0]);
         } else {
         	return false;
         }
-        
+
         if (sizeof($indexfields) >= 2) {
         	$doc->set('content', $indexfields[1]); 
         } else {
@@ -158,7 +153,8 @@ class entry extends \core_search\area\base_mod {
     		return \core_search\manager::ACCESS_DENIED;
     	}
 
-    	$cm = $this->get_cm('data', $entry->dataid, $entry->course);
+    	//$cm = $this->get_cm('data', $entry->dataid, $entry->course);
+    	$cm = get_coursemodule_from_instance('data', $this->data->id);
     	$context = \context_module::instance($cm->id);
 
     	if(!has_capability('mod/data:viewentry', $context)) {
@@ -337,7 +333,7 @@ class entry extends \core_search\area\base_mod {
     		
     		$fieldorderqueue->insert($content, sizeof($fieldorder) - array_search($content->fldname, $fieldorder));
     	}    	
-    	
+
     	$filteredcontents = array();
     	
     	while ($fieldorderqueue->valid()) {
@@ -368,14 +364,7 @@ class entry extends \core_search\area\base_mod {
     			$fieldvalue = trim($fieldvalue);
 
     		} elseif ($content->fldtype === 'textarea') {
-				
-    			// Removing all the <p> and <br /> tags from the stored textarea field contents.
-    			$fieldvalue = trim($content->content);
-    			$fieldvalue = str_replace('<br />', ' ', $fieldvalue);
-    			$fieldvalue = str_replace('<p>', '', $fieldvalue);
-    			$fieldvalue = str_replace('</p>', ' ', $fieldvalue);
-    			$fieldvalue = trim($fieldvalue);
-
+    			$fieldvalue = clean_param($content->content, PARAM_NOTAGS);
     		} else {
     			$fieldvalue = trim($content->content);
     		}
