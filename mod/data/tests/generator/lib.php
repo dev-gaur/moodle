@@ -81,6 +81,9 @@ class mod_data_generator extends testing_module_generator {
     public function create_field($record = null, $data = null) {
 		global $DB;
 
+		if (in_array($record['type'], $this->ignoredfieldtypes)) {
+			return false;
+		}
 		$this->databasefieldcount++;
 
     	$record = (array) $record;
@@ -165,46 +168,91 @@ class mod_data_generator extends testing_module_generator {
     public function create_entry($data, $contents) {
 
     	$this->databaserecordcount++;
+
+    	$recordid = data_add_record($data);
     	
-    	$time = time() + $this->databaserecordcount;
+    	$fields = $DB->get_records('data_fields', array( 'dataid' => $data->id));
 
-    	$fields = $DB->get_records('data_fields', array('dataid' => $data));
-
-    	// Validate the form to ensure that enough data was submitted.
-    	$processeddata = data_process_submission($data, $fields, $contents);
-
-    	$recordid = data_add_record($data);    	
-
-    	// Insert a whole lot of empty records to make sure we have them.
-    	$records = array();
+    	// validating whether required field are filled.
     	foreach ($fields as $field) {
-    		$content = new stdClass();
-    		$content->recordid = $recordid;
-    		$content->fieldid = $field->id;
-    		$records[] = $content;
+    		$fieldhascontent = false;    		
     		
-    		if (!isset($field->name)) {
+    		if (in_array($field->type, $this->ignoredfields)) {
+    			continue;
+    		}
 
-    			if(!$field->required) {
-    				$content->content = '';
-    			} else {
-    				if (($field->type == 'checkbox') || ($field->type == 'checkbox')) {
-    					$content->content = str_replace('\n', '##', $field->param1);
-    				}
-    				if (($field->type == 'menu') || ($field->type == 'radiobutton')) {
-    					$options = explode($field->param1, '\n');
-    					$content->content = $options[0];
-    				}
-    				if () {
-    					
-    				}
-    			}
+    		if($field->notemptyfield ($contents[$field->id], 'field_'.$field->id.'_0')) {
+    			$fieldhascontent = true;
     		}
     		
-    		$field->update_content($recordid, $value);
+    		if ($field->required && !$fieldhascontent) {
+    			return false;
+    		}
+    	}
+
+    	foreach ($contents as $fieldid => $content) {
+    		
+    		$field = $DB->get_record('data_fields', array( 'id' => $fieldid));
+    		$field = data_get_field($field, $data);
+
+    		
+    		if (in_array($field->field->type, $this->ignoredfields)) {
+    			continue;
+    		}
+    		
+    		if($field->type === 'date') {
+    			$values = array();
+
+    			$temp = explode('-', $content, 3);
+    			
+    			$values['field_'.$field->id.'_day'] = $temp[0];
+    			$values['field_'.$field->id.'_month'] = $temp[1];
+    			$values['field_'.$field->id.'_year'] = $temp[2];
+    			
+    			foreach ($values as $fieldname => $value) {
+    				$field->update_content($recordid, trim($value), $fieldname);
+    			}
+
+    			continue;
+    		}
+
+    		if($field->type === 'textarea') {
+    			$values = array();
+
+    			$values['field_'.$fieldid] = $content;
+    			$values['field_'.$fieldid.'_content1'] = 1;
+    			
+    			foreach ($values as $fieldname => $value) {
+    				$field->update_content($recordid, $value, $fieldname);
+    			}
+
+    			continue;
+    		}
+    		
+    		if($field->type === 'url') {
+    			$values = array();
+
+    			if (is_array($content)) {
+    				foreach ($content as $key => $value) {
+    					$values['field_'.$fieldid.'_'.$key] = $value;
+    				}
+    			} else {
+    				$values['field_'.$fieldid.'_0'] = $content;
+    			}
+    			
+    			foreach ($values as $fieldname => $value) {
+    				$field->update_content($recordid, $value, $fieldname);
+    			}
+    			
+    			continue;
+    		}
+    		
+    		$field->update_content($recordid, $contents[$field->field->id]);
     	}
 
     	return $recordid;
+    	
     }
+
 
 }

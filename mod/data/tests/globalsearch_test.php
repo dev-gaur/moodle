@@ -61,6 +61,7 @@ class data_advanced_search_sql_test extends advanced_testcase {
 	 * @return void
 	 */
 	public function test_data_entries_indexing() {
+		global $DB;
 
 		// Returns the instance as long as the area is supported.
 		$searcharea = \core_search\manager::get_search_area($this->databaseentryareaid);
@@ -89,6 +90,7 @@ class data_advanced_search_sql_test extends advanced_testcase {
 		
         $count = 1;
 
+        // Creating test Fields with default parameter values
         foreach ($fieldtypes as $fieldtype) {
         	
 			// Creating variables dynamically
@@ -102,14 +104,26 @@ class data_advanced_search_sql_test extends advanced_testcase {
 			$count++;
         }
 
-        // Create Record
-        $record = new stdClass();
-        
-        // Content Values of the Record
-		$contents = array();        
-        
-        $data1record1 = $this->getDataGenerator()->get_plugin_generator('mod_data')->create_record($record);
+        $fields = $DB->get_records('data_fields', array('dataid' => $data1->id), 'id');
 
+        $contents = array();
+        $contents[] = array('one', 'two', 'three', 'four');
+        $contents[] = '27-07-2016';
+        $contents[] = 'one';
+        $contents[] =  array('one', 'two', 'three', 'four');
+        $contents[] = '12345';
+        $contents[] = 'one';
+        $contents[] = 'text for testing';
+        $contents[] = '<p>text area testing<br /></p>';
+        $contents[] = array('example.url', 'sampleurl');
+        
+        $count = 1;
+        
+        foreach ($fields as $fieldrecord) {
+        	$fieldcontents[$fieldrecord->id] = $contents[$count++];
+        }
+ 
+        $data1record1 = $this->getDataGenerator()->get_plugin_generator('mod_data')->create_entry($data1, $fieldcontents);
 
         // All records.
         $recordset = $searcharea->get_recordset_by_timestamp(0);
@@ -124,7 +138,7 @@ class data_advanced_search_sql_test extends advanced_testcase {
         
         // If there would be an error/failure in the foreach above the recordset would be closed on shutdown.
         $recordset->close();
-        $this->assertEquals(3, $nrecords);
+        $this->assertEquals(1, $nrecords);
         
         // The +2 is to prevent race conditions.
         $recordset = $searcharea->get_recordset_by_timestamp(time() + 2);
