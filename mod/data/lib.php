@@ -3910,7 +3910,7 @@ function data_process_submission(stdClass $mod, $fields, stdClass $datarecord) {
     $result->fields = array();
 
     $submitteddata = array();
-    var_dump($datarecord);
+    //var_dump($datarecord);
     foreach ($datarecord as $fieldname => $fieldvalue) {
         if (strpos($fieldname, '_')) {
             $namearray = explode('_', $fieldname, 3);
@@ -3947,12 +3947,13 @@ function data_process_submission(stdClass $mod, $fields, stdClass $datarecord) {
                 }
             }
             foreach ($submitteddata[$fieldrecord->id] as $fieldname => $value) {
+            	//var_dump($value);
                 if ($field->notemptyfield($value->value, $value->fieldname)) {
                     // The field has content and the form is not empty.
                     $fieldhascontent = true;
                     $emptyform = false;
                 }
-            }
+            } 
         }
 
         // If the field is required, add a notification to that effect.
@@ -3971,7 +3972,7 @@ function data_process_submission(stdClass $mod, $fields, stdClass $datarecord) {
             }
         }
     }
-
+//    die('mod_data/lib.php L3941');
     if ($emptyform) {
         // The form is empty.
         $result->generalnotifications[] = get_string('emptyaddform', 'data');
@@ -3979,7 +3980,7 @@ function data_process_submission(stdClass $mod, $fields, stdClass $datarecord) {
 
     $result->validated = $requiredfieldsfilled && !$emptyform && $fieldsvalidated;
 
-    var_dump($result);
+    //var_dump($result);
 
     return $result;
 }

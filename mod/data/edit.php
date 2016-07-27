@@ -223,9 +223,12 @@ if ($datarecord = data_submitted() and confirm_sesskey()) {
         // Retrieve the format for the fields.
         $fields = $DB->get_records('data_fields', array('dataid' => $datarecord->d));
 
+        //var_dump($datarecord);
+        //die("Mar gya..sirf tere liye!");
         // Validate the form to ensure that enough data was submitted.
         $processeddata = data_process_submission($data, $fields, $datarecord);
-
+		//var_dump($processeddata);
+		
         // Add the new notification data.
         $generalnotifications = array_merge($generalnotifications, $processeddata->generalnotifications);
         $fieldnotifications = array_merge($fieldnotifications, $processeddata->fieldnotifications);
@@ -247,11 +250,12 @@ if ($datarecord = data_submitted() and confirm_sesskey()) {
 
             // Add all provided content.
             foreach ($processeddata->fields as $fieldname => $field) {
-            	var_dump($fieldname);
-            	var_dump($datarecord->$fieldname);
+				//var_dump($field);
+            	//var_dump($fieldname);
+            	//var_dump($datarecord->$fieldname);
                 $field->update_content($recordid, $datarecord->$fieldname, $fieldname);
             }
-
+            //die('mod_data/edit L257');            
             // Trigger an event for updating this record.
             $event = \mod_data\event\record_created::create(array(
                 'objectid' => $rid,
