@@ -80,13 +80,14 @@ class mod_data_generator extends testing_module_generator {
 
     public function create_field($record = null, $data = null) {
 		global $DB;
-
-		if (in_array($record['type'], $this->ignoredfieldtypes)) {
-			return false;
-		}
-		$this->databasefieldcount++;
-
+		
     	$record = (array) $record;
+
+    	if (in_array($record['type'], $this->ignoredfieldtypes)) {
+    		return false;
+    	}
+    	
+    	$this->databasefieldcount++;
 
         if (!isset($data->course)) {
             throw new coding_exception('course must be present in phpunit_util::create_field() $data');
@@ -94,6 +95,8 @@ class mod_data_generator extends testing_module_generator {
 
         if (!isset($data->id)) {
             throw new coding_exception('dataid must be present in phpunit_util::create_field() $data');
+        } else {
+        	$record['dataid'] = $data->id;
         }
 
         if (!isset($record['type'])) {
@@ -113,13 +116,10 @@ class mod_data_generator extends testing_module_generator {
         }
 
         if (!isset($record['param1'])) {
-        	
-        	if (($record['type'] === 'menu') || ($record['type'] === 'menu') || ($record['type'] === 'menu') || ($record['type'] === 'radiobutton')) {
-        		$record['param1'] = 'one\ntwo\nthree\nfour';
-        	} elseif (($record['type'] === 'textarea')) {
-        		$record['param1'] = 'Test Textarea - ' . $this->databasefieldcount;
-        	} elseif (($record['type'] === 'text')) {
-        		$record['param1'] = 'Test Text - ' . $this->databasefieldcount;
+        	if (in_array($record['type'], array('checkbox', 'menu', 'multimenu', 'radiobutton'))) {
+        		$record['param1'] = implode("\n", array('one', 'two', 'three', 'four'));
+        	} elseif (($record['type'] === 'text') || ($record['type'] === 'url')) {
+        		$record['param1'] = 1;
         	} else {
         		$record['param1'] = '';
         	}
@@ -148,26 +148,31 @@ class mod_data_generator extends testing_module_generator {
         if (!isset($record['param4'])) {
 
         	if (($record['type'] === 'textarea')) {
-        		$record['param4'] = 0;
+        		$record['param4'] = 1;
         	}        
 		}
 		
 		if (!isset($record['param5'])) {
-			$record['param5'] = '';
+			if (($record['type'] === 'textarea')) {
+				$record['param5'] = 0;
+			}
 		}
 
         $record = (object) $record;
 
-        $fieldobj = data_get_field($record, $data);
-        $fieldobj->insert_field();
+        $field = data_get_field($record, $data);
+        $field->insert_field();
 
-        return $fieldobj;
+        data_generate_default_template($data, 'addtemplate', 0, false, true);
+
+        return $field;
     }
     
 
     public function create_entry($data, $contents) {
+		global $DB;
 
-    	$this->databaserecordcount++;
+		$this->databaserecordcount++;
 
     	$recordid = data_add_record($data);
     	
@@ -175,28 +180,77 @@ class mod_data_generator extends testing_module_generator {
 
     	// validating whether required field are filled.
     	foreach ($fields as $field) {
-    		$fieldhascontent = false;    		
-    		
-    		if (in_array($field->type, $this->ignoredfields)) {
+    		$fieldhascontent = false;
+
+    		if (in_array($field->type, $this->ignoredfieldtypes)) {
     			continue;
     		}
 
-    		if($field->notemptyfield ($contents[$field->id], 'field_'.$field->id.'_0')) {
-    			$fieldhascontent = true;
+    		$field = data_get_field($field, $data);
+
+    		$fieldid = $field->field->id;
+
+    		if($field->type === 'date') {
+    			$values = array();
+    		
+    			$temp = explode('-', $contents[$fieldid], 3);
+    			 
+    			$values['field_'.$fieldid.'_day'] = $temp[0];
+    			$values['field_'.$fieldid.'_month'] = $temp[1];
+    			$values['field_'.$fieldid.'_year'] = $temp[2];
+    			 
+    			foreach ($values as $fieldname => $value) {
+    			   	if ($field->notemptyfield ($value, $fieldname)) {
+    					$fieldhascontent = true;
+    				}
+    			}
+    		} elseif ($field->type === 'textarea') {
+    			$values = array();
+    		
+    			$values['field_'.$fieldid] = $contents[$fieldid];
+    			$values['field_'.$fieldid.'_content1'] = 1;
+    			 
+    			foreach ($values as $fieldname => $value) {
+    				if ($field->notemptyfield ($value, $fieldname)) {
+    					$fieldhascontent = true;
+    				}
+    			}    		
+    		} elseif ($field->type === 'url') {
+    			$values = array();
+    		
+    			if (is_array($contents[$fieldid])) {
+    				foreach ($contents[$fieldid] as $key => $value) {
+    					$values['field_'.$fieldid.'_'.$key] = $value;
+    				}
+    			} else {
+    				$values['field_'.$fieldid.'_0'] = $contents[$fieldid];
+    			}
+    			 
+    			foreach ($values as $fieldname => $value) {
+    				if($field->notemptyfield ($value, $fieldname)) {
+    					$fieldhascontent = true;
+    				}
+    			}
+    			
+    		} else {
+
+    			if($field->notemptyfield ($contents[$fieldid], 'field_'.$fieldid.'_0')) {
+    				$fieldhascontent = true;
+    			}
     		}
     		
-    		if ($field->required && !$fieldhascontent) {
+    		if ($field->field->required && !$fieldhascontent) {
     			return false;
     		}
     	}
 
     	foreach ($contents as $fieldid => $content) {
-    		
+
     		$field = $DB->get_record('data_fields', array( 'id' => $fieldid));
     		$field = data_get_field($field, $data);
 
     		
-    		if (in_array($field->field->type, $this->ignoredfields)) {
+    		if (in_array($field->field->type, $this->ignoredfieldtypes)) {
     			continue;
     		}
     		
@@ -205,9 +259,9 @@ class mod_data_generator extends testing_module_generator {
 
     			$temp = explode('-', $content, 3);
     			
-    			$values['field_'.$field->id.'_day'] = $temp[0];
-    			$values['field_'.$field->id.'_month'] = $temp[1];
-    			$values['field_'.$field->id.'_year'] = $temp[2];
+    			$values['field_'.$fieldid.'_day'] = $temp[0];
+    			$values['field_'.$fieldid.'_month'] = $temp[1];
+    			$values['field_'.$fieldid.'_year'] = $temp[2];
     			
     			foreach ($values as $fieldname => $value) {
     				$field->update_content($recordid, trim($value), $fieldname);
@@ -247,12 +301,11 @@ class mod_data_generator extends testing_module_generator {
     			continue;
     		}
     		
-    		$field->update_content($recordid, $contents[$field->field->id]);
+    		$field->update_content($recordid, $contents[$fieldid]);
     	}
 
     	return $recordid;
     	
     }
-
 
 }

@@ -89,9 +89,6 @@ class entry extends \core_search\area\base_mod {
             return false;
         }
 
-        $indexfields = array();
-        $contents = $DB->get_records('data_content', array('recordid' => $entry->id));
-
         // Prepare associative array with data from DB.
         $doc = \core_search\document_factory::instance($entry->id, $this->componentname, $this->areaname);
         $doc->set('contextid', $context->id);
@@ -268,7 +265,7 @@ class entry extends \core_search\area\base_mod {
     	$indexfields = array();
 
     	$validfields = array('text', 'textarea', 'menu', 'radiobutton', 'checkbox', 'multimenu', 'url');
-    	
+
     	$fieldtypepriorities = array(
     			'text' => 4,
     			'textarea' => 3,
@@ -284,63 +281,43 @@ class entry extends \core_search\area\base_mod {
     	$contents = $DB->get_records_sql($sql, array($entry->id));
     	$filteredcontents = array();
 
+    	
+    	$template = $DB->get_record_sql('SELECT addtemplate FROM {data} WHERE id = ?', array($entry->dataid));
+    	$template = $template->addtemplate;
+
 		// Filtering out the data_content records having invalid fieldtypes.
     	foreach ($contents as $content) {
     		if (in_array($content->fldtype, $validfields)) {
     			$filteredcontents[] = $content;
     		}
     	}
-    	
-    	$validfieldsname = array();
+
     	foreach ($filteredcontents as $content) {
     		$content->priority = $fieldtypepriorities[$content->fldtype];
-    		$validfieldsnames[] = $content->fldname;
-    	}
+    		$content->addtemplateposition = strpos($template, '[['.$content->fldname.']]');
+    		echo '\n[['.$content->fldname.']]\n';
+    	}    	
 
-    	// Array to describe the order of the selected fields.
-    	$fieldorder = array();
+    	$orderqueue = new \SPLPriorityQueue();
 
-    	// Retrieving order of fields from the 'Add Entry template' of the database.
-    	$dom = new DOMDocument();
-
-    	$template = $DB->get_record_sql('SELECT addtemplate FROM {data} WHERE id = ?', array($entry->dataid));
-    	$template = $template->addtemplate;
-
-    	$dom->loadHTML($template);
-    	$dom->preserveWhiteSpace = false;
-
-    	$rowsintemplate = $dom->getElementsByTagName('tr');
-    	 
-    	$numberofrowsintemplate = $rowsintemplate->length;
-    	
-    	foreach ($rowsintemplate as $row) {
-    	
-    		$txtContent = $row->childNodes[2]->textContent;
-    		$txtContent = rtrim($txtContent, ']]');
-    		$txtContent = ltrim($txtContent, '[[');
-
-    		if(in_array($txtContent, $validfieldsnames)){
-    			$fieldorder[] = $txtContent;
-    		}
-    	}
-
-    	// Removing all the duplicate fieldname entries from the order.
-    	$fieldorder = array_unique($fieldorder);
-    	
-    	$fieldorderqueue = new \SPLPriorityQueue();
-
+    	// Filtering out the contents which belong to fields that aren't present in the addtemplate of the database activity instance
     	foreach ($filteredcontents as $content) {
     		
-    		$fieldorderqueue->insert($content, sizeof($fieldorder) - array_search($content->fldname, $fieldorder));
-    	}    	
+    		if ($content->addtemplateposition || ($content->addtemplateposition === 0)) {
+    			$orderqueue->insert($content, $content->addtemplateposition);
+    		}
+    	}	
 
     	$filteredcontents = array();
     	
-    	while ($fieldorderqueue->valid()) {
-    		$filteredcontents[] = $fieldorderqueue->extract();
+    	while ($orderqueue->valid()) {
+    		$filteredcontents[] = $orderqueue->extract();
     	}
 
-    	// Using a PriorityQueure instance to sort out the filtered contents according to these rules :
+    	// SPLPriorityQueue sorts according to descending order of the priority (here, addtemplateposition)
+    	$filteredcontents = array_reverse($filteredcontents);
+
+    	// Using a CUSTOM SPLPriorityQueure instance to sort out the filtered contents according to these rules :
     	// 1. Priorities in $fieldtypepriorities
     	// 2. Compulsory fieldtypes are to be given the top priority.
     	$sortedcontentqueue = new SortedContentQueue($filteredcontents);
@@ -372,7 +349,7 @@ class entry extends \core_search\area\base_mod {
     		$indexfields[] = $fieldvalue;
     	}
 
-    	
+    	var_dump($indexfields);
     	return $indexfields;
     }
 

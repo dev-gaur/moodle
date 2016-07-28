@@ -96,11 +96,10 @@ class data_advanced_search_sql_test extends advanced_testcase {
 			// Creating variables dynamically
         	$fieldname = 'field-'.$count;
         	$record = new StdClass();
-			$record->name = 'field-'.$count;
+			$record->name = $fieldname;
 			$record->type = $fieldtype;
 
 			${$fieldname} = $this->getDataGenerator()->get_plugin_generator('mod_data')->create_field($record, $data1);
-
 			$count++;
         }
 
@@ -116,26 +115,29 @@ class data_advanced_search_sql_test extends advanced_testcase {
         $contents[] = 'text for testing';
         $contents[] = '<p>text area testing<br /></p>';
         $contents[] = array('example.url', 'sampleurl');
-        
-        $count = 1;
-        
+//        var_dump($fields);
+        $count = 0;
+        $fieldcontents = array();
         foreach ($fields as $fieldrecord) {
         	$fieldcontents[$fieldrecord->id] = $contents[$count++];
         }
- 
-        $data1record1 = $this->getDataGenerator()->get_plugin_generator('mod_data')->create_entry($data1, $fieldcontents);
 
+        $data1record1 = $this->getDataGenerator()->get_plugin_generator('mod_data')->create_entry($data1, $fieldcontents);
+		//var_dump($data1record1);
         // All records.
         $recordset = $searcharea->get_recordset_by_timestamp(0);
+        //var_dump($recordset);
         $this->assertTrue($recordset->valid());
+
         $nrecords = 0;
         foreach ($recordset as $record) {
         	$this->assertInstanceOf('stdClass', $record);
+        	//var_dump($record);
         	$doc = $searcharea->get_document($record);
         	$this->assertInstanceOf('\core_search\document', $doc);
         	$nrecords++;
         }
-        
+
         // If there would be an error/failure in the foreach above the recordset would be closed on shutdown.
         $recordset->close();
         $this->assertEquals(1, $nrecords);

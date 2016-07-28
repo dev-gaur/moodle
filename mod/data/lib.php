@@ -3947,7 +3947,8 @@ function data_process_submission(stdClass $mod, $fields, stdClass $datarecord) {
                 }
             }
             foreach ($submitteddata[$fieldrecord->id] as $fieldname => $value) {
-            	//var_dump($value);
+            	var_dump($value->value);
+            	var_dump($value->fieldname);
                 if ($field->notemptyfield($value->value, $value->fieldname)) {
                     // The field has content and the form is not empty.
                     $fieldhascontent = true;
@@ -3972,7 +3973,7 @@ function data_process_submission(stdClass $mod, $fields, stdClass $datarecord) {
             }
         }
     }
-//    die('mod_data/lib.php L3941');
+
     if ($emptyform) {
         // The form is empty.
         $result->generalnotifications[] = get_string('emptyaddform', 'data');
