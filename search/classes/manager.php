@@ -239,7 +239,7 @@ class manager {
                 $componentname = $plugintype . '_' . $pluginname;
                 $searchclasses = \core_component::get_component_classes_in_namespace($componentname, 'search');
                 foreach ($searchclasses as $classname => $classpath) {
-                    $areaname = substr(strrchr($classname, '\\'), 1);
+                	$areaname = substr(strrchr($classname, '\\'), 1);
                     $areaid = static::generate_areaid($componentname, $areaname);
                     $searchclass = new $classname();
                     if (!$enabled || ($enabled && $searchclass->is_enabled())) {
@@ -255,12 +255,17 @@ class manager {
             $searchclasses = \core_component::get_component_classes_in_namespace($componentname, 'search');
 
             foreach ($searchclasses as $classname => $classpath) {
-                $areaname = substr(strrchr($classname, '\\'), 1);
-                $areaid = static::generate_areaid($componentname, $areaname);
-                $searchclass = new $classname();
-                if (!$enabled || ($enabled && $searchclass->is_enabled())) {
-                    $searchareas[$areaid] = $searchclass;
-                }
+
+            	$areaname = substr(strrchr($classname, '\\'), 1);
+            	$$areaname = new \ReflectionClass($classname);
+
+            	if($$areaname->IsInstantiable()) {
+            		$areaid = static::generate_areaid($componentname, $areaname);
+            		$searchclass = new $classname();
+            		if (!$enabled || ($enabled && $searchclass->is_enabled())) {
+            			$searchareas[$areaid] = $searchclass;
+            		}
+            	}
             }
         }
 
