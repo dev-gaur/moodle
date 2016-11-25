@@ -6,4 +6,5 @@
         <MODS>
           [#node_course_sections_section_mods_mod#]
         </MODS>
+        <TIMEMODIFIED>[#date_now#]</TIMEMODIFIED>
       </SECTION>

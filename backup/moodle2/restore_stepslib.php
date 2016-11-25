@@ -795,7 +795,8 @@ class restore_rebuild_course_cache extends restore_execution_step {
             if (!$DB->record_exists('course_sections', array('course' => $this->get_courseid(), 'section' => $i))) {
                 $sectionrec = array(
                     'course' => $this->get_courseid(),
-                    'section' => $i);
+                    'section' => $i,
+                    'timemodified' => time());
                 $DB->insert_record('course_sections', $sectionrec); // missing section created
             }
         }
@@ -1592,6 +1593,8 @@ class restore_section_structure_step extends restore_structure_step {
                             $data, true);
                 }
             }
+
+            $section->timemodified = empty($data->timemodified) ? time() : $data->timemodified;
             $newitemid = $DB->insert_record('course_sections', $section);
             $restorefiles = true;
 
@@ -1606,6 +1609,8 @@ class restore_section_structure_step extends restore_structure_step {
                 $section->summaryformat = $data->summaryformat;
                 $restorefiles = true;
             }
+
+            $section->timemodified = time();
 
             // Don't update availability (I didn't see a useful way to define
             // whether existing or new one should take precedence).
@@ -3985,11 +3990,13 @@ class restore_module_structure_step extends restore_structure_step {
         if (!$data->section) { // no sections in course, create section 0 and 1 and assign module to 1
             $sectionrec = array(
                 'course' => $this->get_courseid(),
-                'section' => 0);
+                'section' => 0,
+                'timemodified' => time());
             $DB->insert_record('course_sections', $sectionrec); // section 0
             $sectionrec = array(
                 'course' => $this->get_courseid(),
-                'section' => 1);
+                'section' => 1,
+                'timemodified' => time());
             $data->section = $DB->insert_record('course_sections', $sectionrec); // section 1
         }
         $data->groupingid= $this->get_mappingid('grouping', $data->groupingid);      // grouping
