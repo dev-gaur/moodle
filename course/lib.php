@@ -857,6 +857,7 @@ function course_create_sections_if_missing($courseorid, $sections) {
             $cw->summary  = '';
             $cw->summaryformat = FORMAT_HTML;
             $cw->sequence = '';
+            $cw->timemodified = time();
             $id = $DB->insert_record("course_sections", $cw);
             $coursechanged = true;
         }
@@ -1579,6 +1580,7 @@ function course_update_section($course, $section, $data) {
 
     // Update record in the DB and course format options.
     $data['id'] = $section->id;
+    $data['timemodified'] = time();
     $DB->update_record('course_sections', $data);
     rebuild_course_cache($courseid, true);
     course_get_format($courseid)->update_section_format_options($data);

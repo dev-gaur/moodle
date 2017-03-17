@@ -1592,6 +1592,8 @@ class restore_section_structure_step extends restore_structure_step {
                             $data, true);
                 }
             }
+
+            $section->timemodified = !isset($data->timemodified) ? 0 : $this->apply_date_offset($data->timemodified);
             $newitemid = $DB->insert_record('course_sections', $section);
             $restorefiles = true;
 
@@ -1607,6 +1609,7 @@ class restore_section_structure_step extends restore_structure_step {
                 $restorefiles = true;
             }
 
+            $section->timemodified = !isset($data->timemodified) ? 0 : $this->apply_date_offset($data->timemodified);
             // Don't update availability (I didn't see a useful way to define
             // whether existing or new one should take precedence).
 
@@ -4006,11 +4009,13 @@ class restore_module_structure_step extends restore_structure_step {
         if (!$data->section) { // no sections in course, create section 0 and 1 and assign module to 1
             $sectionrec = array(
                 'course' => $this->get_courseid(),
-                'section' => 0);
+                'section' => 0,
+                'timemodified' => $this->apply_date_offset($data->timemodified));
             $DB->insert_record('course_sections', $sectionrec); // section 0
             $sectionrec = array(
                 'course' => $this->get_courseid(),
-                'section' => 1);
+                'section' => 1,
+                'timemodified' => $this->apply_date_offset($data->timemodified));
             $data->section = $DB->insert_record('course_sections', $sectionrec); // section 1
         }
         $data->groupingid= $this->get_mappingid('grouping', $data->groupingid);      // grouping
