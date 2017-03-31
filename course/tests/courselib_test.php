@@ -622,12 +622,18 @@ class core_course_courselib_testcase extends advanced_testcase {
         // this will do nothing, section already exists
         $this->assertFalse(course_create_sections_if_missing($course, $course->numsections));
 
+        sleep(1);
         // this will create new section
         $this->assertTrue(course_create_sections_if_missing($course, $course->numsections + 1));
 
         // Ensure all 7 (0-6) sections were created and modinfo/sectioninfo cache works properly
         $sectionscreated = array_keys(get_fast_modinfo($course)->get_section_info_all());
         $this->assertEquals(range(0, $course->numsections + 1), $sectionscreated);
+
+        $existingsection = $DB->get_record('course_sections', array('course' => $course->id, 'section' => $course->numsections));
+        $createdsection = $DB->get_record('course_sections', array('course' => $course->id, 'section' => $course->numsections + 1));
+
+        $this->assertTrue(intval($existingsection->timemodified) < intval($createdsection->timemodified));
     }
 
     public function test_update_course() {
@@ -675,6 +681,26 @@ class core_course_courselib_testcase extends advanced_testcase {
         } catch (moodle_exception $e) {
             $this->assertEquals(get_string('shortnametaken', 'error', $created2->shortname), $e->getMessage());
         }
+    }
+
+    public function test_update_course_section() {
+        global $DB;
+
+        $this->resetAfterTest();
+        // Create the course with sections.
+        $course = $this->getDataGenerator()->create_course(array('numsections' => 10), array('createsections' => true));
+        $sections = $DB->get_records('course_sections', array('course' => $course->id));
+
+        $section = array_pop($sections);
+        $oldtimemodified = $section->timemodified;
+
+        $id = $section->id;
+        $data = array('name' => 'New section title', 'summary' => 'New section summary');
+        sleep(1); // Ensuring that the section update occurs at a different timestamp.
+        course_update_section($course, $section, $data);
+        $section = $DB->get_record('course_sections', array('id' => $id));
+        $newtimemodified = $section->timemodified;
+        $this->assertNotEquals($oldtimemodified, $newtimemodified);
     }
 
     public function test_course_add_cm_to_section() {
